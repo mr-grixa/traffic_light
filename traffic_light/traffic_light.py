@@ -59,16 +59,16 @@ import cv2
 import numpy as np
 from sklearn.cluster import DBSCAN
 
-def search(mask):
-        # Ќаходим индексы ненулевых пикселей на маске
-    indices = np.nonzero(mask)
+#def search(mask):
+#        # Ќаходим индексы ненулевых пикселей на маске
+#    indices = np.nonzero(mask)
     
-    # ѕреобразуем индексы в массив numpy
-    pixels = np.array(indices).T
+#    # ѕреобразуем индексы в массив numpy
+#    pixels = np.array(indices).T
     
-    if len(pixels) > 0:
-        # ѕримен€ем алгоритм DBSCAN дл€ кластеризации пикселей на маске
-        labels = dbscan.fit_predict(pixels)
+#    if len(pixels) > 0:
+#        # ѕримен€ем алгоритм DBSCAN дл€ кластеризации пикселей на маске
+#        labels = dbscan.fit_predict(pixels)
       
         ## —оздаем пустой словарь дл€ сопоставлени€
         #clusters = {}
@@ -127,6 +127,23 @@ def search(mask):
         #        # «аписываем цвет кластера в соответствующий пиксель результирующего изображени€
         #        frame[pixel[0], pixel[1]] = color
 
+def find_convex_contours(mask, min_area=100, max_area=500):
+    ## преобразование изображени€ в оттенки серого
+    #gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    ## бинаризаци€ изображени€
+    #ret, thresh = cv2.threshold(image, 127, 255, cv2.THRESH_BINARY)
+    # поиск контуров на бинаризованном изображении
+    contours, hierarchy = cv2.findContours (mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    # поиск выпуклых контуров
+    convex_contours = []
+    for contour in contours:
+        # вычисление площади контура
+        area = cv2.contourArea(contour)
+        if area > min_area and area <max_area:
+            hull = cv2.convexHull(contour)
+            convex_contours.append(hull)
+    return convex_contours
+
 rectMax=200
 rectMin=25
 
@@ -137,7 +154,7 @@ while True:
     # «ахватываем кадр с камеры
     ret, frame = cap.read()
     frame =cv2.resize(frame,[640,480])
-    #frame = cv2.GaussianBlur(frame, (3, 3), 0)
+    frame = cv2.GaussianBlur(frame, (3, 3), 0)
 
      # ѕровер€ем, что кадр успешно прочитан
     if ret:
@@ -162,10 +179,15 @@ while True:
         upper_blue = (130, 255, 255)
         mask_blue = cv2.inRange(hsv, lower_blue, upper_blue)
 
-        rect_blue= search(mask_blue)
-        rect_yellow= search(mask_yellow)
-        rect_red= search(mask_red)
-        rect_green= search(mask_green)
+
+        convex_contours = find_convex_contours(mask_green, min_area=500,max_area=5000)
+        cv2.drawContours(frame, convex_contours, -1, (0, 255, 0), 3)
+        convex_contours = find_convex_contours(mask_red, min_area=500,max_area=5000)
+        cv2.drawContours(frame, convex_contours, -1, (255, 0, 0), 3)
+        convex_contours = find_convex_contours(mask_yellow, min_area=500,max_area=5000)
+        cv2.drawContours(frame, convex_contours, -1, (0, 255, 255), 3)
+        convex_contours = find_convex_contours(mask_blue, min_area=500,max_area=5000)
+        cv2.drawContours(frame, convex_contours, -1, (0, 255, 0), 3)
 
         # ќтображаем изображение с камеры
         cv2.imshow('frame', frame)
