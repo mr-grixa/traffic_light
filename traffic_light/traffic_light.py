@@ -57,6 +57,7 @@
 
 import cv2
 import numpy as np
+from mss import mss
 from sklearn.cluster import DBSCAN
 
 #def search(mask):
@@ -127,37 +128,54 @@ from sklearn.cluster import DBSCAN
         #        # «аписываем цвет кластера в соответствующий пиксель результирующего изображени€
         #        frame[pixel[0], pixel[1]] = color
 
-def find_convex_contours(mask, min_area=100, max_area=500):
+def find_convex_contours(mask, rectMin=100, rectMax=500,indent=7):
     ## преобразование изображени€ в оттенки серого
     #gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     ## бинаризаци€ изображени€
     #ret, thresh = cv2.threshold(image, 127, 255, cv2.THRESH_BINARY)
     # поиск контуров на бинаризованном изображении
-    contours, hierarchy = cv2.findContours (mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    contours, hierarchy = cv2.findContours (mask, cv2.RETR_EXTERNAL , cv2.CHAIN_APPROX_SIMPLE)
     # поиск выпуклых контуров
-    convex_contours = []
+    rectangles = []
+    #convex_contours = []
     for contour in contours:
-        # вычисление площади контура
-        area = cv2.contourArea(contour)
-        if area > min_area and area <max_area:
-            hull = cv2.convexHull(contour)
-            convex_contours.append(hull)
-    return convex_contours
+        hull = cv2.convexHull(contour)
+        #convex_contours.append(hull)
+        x, y, w, h = cv2.boundingRect(hull)
+        if w >rectMin and w <rectMax and h >rectMin and h <rectMax:
+            rectangles.append((x-indent,y-indent,x + w+indent, y + h+indent))
+    #    rois = []
+    #for contour in convex_contours:
+    #    # создание маски из контура
+    #    mask = np.zeros_like(mask)
+    #    cv2.drawContours(mask, [contour], 0, 255, -1)
+    #    # применение маски к изображению
+    #    roi = cv2.bitwise_and(mask, mask, mask=mask)
+    #    rois.append(roi)
+    return rectangles
 
 rectMax=200
 rectMin=25
 
 # —оздаем объект захвата кадров с камеры
-cap = cv2.VideoCapture(0)
-dbscan = DBSCAN(eps=10, min_samples=200,algorithm="kd_tree")
+#cap = cv2.VideoCapture(1)
+#dbscan = DBSCAN(eps=10, min_samples=200,algorithm="kd_tree")
+sct = mss()
+monitor = {"top": 0, "left": 0, "width": 1280, "height": 960}
+
+orb = cv2.ORB_create()
 while True:
     # «ахватываем кадр с камеры
-    ret, frame = cap.read()
-    frame =cv2.resize(frame,[640,480])
-    frame = cv2.GaussianBlur(frame, (3, 3), 0)
+    #ret, frame = cap.read()
+    frame = sct.grab(monitor)
+    frame = np.array(frame)
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    #canny = cv2.Canny(frame,100,200)
+    #frame =cv2.resize(frame,[640,480])
+    #frame = cv2.GaussianBlur(frame, (3,3), 0)
 
      # ѕровер€ем, что кадр успешно прочитан
-    if ret:
+    if 1:
         # ѕереводим изображение в цветовое пространство HSV
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
@@ -179,22 +197,56 @@ while True:
         upper_blue = (130, 255, 255)
         mask_blue = cv2.inRange(hsv, lower_blue, upper_blue)
 
+        rectangles = find_convex_contours(mask_red, rectMin,rectMax)
+        for x1, y1, x2, y2 in rectangles:
+            roi = frame[y1:y2, x1:x2]
+            #roiGray=gray[y1:y2, x1:x2]
+            #circles = cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, 1, 20, param1=80, param2=80, minRadius=5, maxRadius=100)
+            #for circle in circles[0]:
+            #    x, y, r = circle
+            #    cv2.circle(roi, (int(x), int(y)), int(r), (0, 255, 0), 2)
+            kp, des = orb.detectAndCompute(roi, None)
+            gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+            gray = cv2.medianBlur(gray, 5)     
+            rows = gray.shape[0]
+            circles = cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, 1, rows / 8,
+                                       param1=100, param2=30,
+                                       minRadius=1, maxRadius=30)  
+            if circles is not None:
+                circles = np.uint16(np.around(circles))
+                for i in circles[0, :]:
+                    center = (i[0], i[1])
+                    # circle center
+                    cv2.circle(roi, center, 1, (0, 100, 100), 3)
+                    # circle outline
+                    radius = i[2]
+                    cv2.circle(roi, center, radius, (255, 0, 255), 3)
 
-        convex_contours = find_convex_contours(mask_green, min_area=500,max_area=5000)
-        cv2.drawContours(frame, convex_contours, -1, (0, 255, 0), 3)
-        convex_contours = find_convex_contours(mask_red, min_area=500,max_area=5000)
-        cv2.drawContours(frame, convex_contours, -1, (255, 0, 0), 3)
-        convex_contours = find_convex_contours(mask_yellow, min_area=500,max_area=5000)
-        cv2.drawContours(frame, convex_contours, -1, (0, 255, 255), 3)
-        convex_contours = find_convex_contours(mask_blue, min_area=500,max_area=5000)
-        cv2.drawContours(frame, convex_contours, -1, (0, 255, 0), 3)
+
+
+            roi = cv2.drawKeypoints(roi, kp, None)
+            frame[y1:y2, x1:x2] =roi
+            cv2.rectangle(frame, (x1, y1), (x2,y2), (0, 0, 255), 1)
+ 
+        #rectangles = find_convex_contours(mask_green, rectMin,rectMax)
+        #for x1, y1, x2, y2 in rectangles:
+        #    cv2.rectangle(frame, (x1, y1), (x2,y2), (0, 255, 0), 2)
+        #rectangles = find_convex_contours(mask_yellow, rectMin,rectMax)
+        #for x1, y1, x2, y2 in rectangles:
+        #    cv2.rectangle(frame, (x1, y1), (x2,y2), (0, 255, 255), 2)       
+        #rectangles = find_convex_contours(mask_blue, rectMin,rectMax)
+        #for x1, y1, x2, y2 in rectangles:
+        #    cv2.rectangle(frame, (x1, y1), (x2,y2), (255, 0, 0), 2)        
+
+
 
         # ќтображаем изображение с камеры
         cv2.imshow('frame', frame)
-        cv2.imshow('mask_blue', mask_blue)
-        cv2.imshow('mask_yellow', mask_yellow)
-        cv2.imshow('mask_red', mask_red)
-        cv2.imshow('mask_green', mask_green)
+        #cv2.imshow('canny', canny)
+        #cv2.imshow('mask_blue', mask_blue)
+        #cv2.imshow('mask_yellow', mask_yellow)
+        #cv2.imshow('mask_red', mask_red)
+        #cv2.imshow('mask_green', mask_green)
         #height, width, channels = frame.shape
 
         ## ¬ыводим размеры
@@ -207,7 +259,9 @@ while True:
         break
 
 # ќсвобождаем ресурсы
-cap.release()
+#cap.release()
+#cv2.destroyAllWindows()
+sct.close()
 cv2.destroyAllWindows()
 
 
