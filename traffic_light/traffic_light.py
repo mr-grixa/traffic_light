@@ -50,7 +50,7 @@ for file_name in os.listdir(folder_path):
         sign=cv2.imread(file_path, cv2.IMREAD_UNCHANGED)
         mask = sign[:, :, 3]
         kp, des = orb.detectAndCompute(sign, mask)
-        sign_red.append((file_name.replace(".png", ""),kp,des))
+        sign_blue.append((file_name.replace(".png", ""),kp,des))
         print(file_name)
 
 
@@ -130,12 +130,14 @@ while True:
                     cv2.circle(circle_mask, (x, y),r, 255, -1)
                     white_pixels = np.sum(circle_mask == 255)
                     fill_ratio = white_pixels / circle_area
-                    if fill_ratio >0.75:
+                    if fill_ratio >0.5:
                         cv2.circle(roi, (int(x), int(y)), int(r), (0, 255, 0), 2)
             cv2.rectangle(frame, (x1, y1), (x2,y2), (0, 0, 255), 1)
             
             if best_match_object is not None:
                 cv2.putText(frame,best_match_object,(x1, y2),cv2.FONT_HERSHEY_SIMPLEX,1,(0, 0, 0),2,cv2.LINE_AA,bottomLeftOrigin=False)
+        
+                
         rectangles = find_convex_contours(mask_green, rectMin,rectMax)
         for x1, y1, x2, y2 in rectangles:
             roiGray=mask_green[y1:y2, x1:x2]
@@ -147,7 +149,7 @@ while True:
                     cv2.circle(circle_mask, (x, y),r, 255, -1)
                     white_pixels = np.sum(circle_mask == 255)
                     fill_ratio = white_pixels / circle_area
-                    if fill_ratio >0.75:
+                    if fill_ratio >0.5:
                         cv2.circle(roi, (int(x), int(y)), int(r), (0, 255, 0), 2)    
             cv2.rectangle(frame, (x1, y1), (x2,y2), (0, 255, 0), 1)
 
@@ -162,7 +164,7 @@ while True:
                     cv2.circle(circle_mask, (x, y),r, 255, -1)
                     white_pixels = np.sum(circle_mask == 255)
                     fill_ratio = white_pixels / circle_area
-                    if fill_ratio >0.75:
+                    if fill_ratio >0.5:
                         cv2.circle(roi, (int(x), int(y)), int(r), (0, 255, 255), 2)
             cv2.rectangle(frame, (x1, y1), (x2,y2), (0, 255, 255), 1)
             
@@ -173,17 +175,19 @@ while True:
             kp, des = orb.detectAndCompute(roi, None)
             matches = {}
             if des is not None and kp is not NULL:
-                for file_name,kpR,desR in sign_blue:
+                for file_name,kpB,desB in sign_blue:
                     bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-                    matches[file_name] = bf.match(desR, des)
+                    matches[file_name] = bf.match(desB, des)
             # Находим наиболее подходящий объект на изображении
             best_match = None
             distCoef = 100
             best_match_object = None
+
             for object_name, match in matches.items():
                 good_matches = []
+                print(f"SSSSSSSSSSSSSS")
                 for m in match:
-                    #print(f"Для обьекта {object_name} совпадение равняется {m.distance}")
+                    print(f"For {object_name} === {m.distance}")
                     if m.distance < 58:
                         good_matches.append(m)
                 if len(good_matches) > 10 and (best_match is None or len(good_matches) > len(best_match)):
@@ -203,10 +207,10 @@ while True:
         # Отображаем изображение с камеры
         cv2.imshow('frame', frame)
         #cv2.imshow('canny', canny)
-        cv2.imshow('mask_blue', mask_blue)
-        cv2.imshow('mask_yellow', mask_yellow)
-        cv2.imshow('mask_red', mask_red)
-        cv2.imshow('mask_green', mask_green)
+        #cv2.imshow('mask_blue', mask_blue)
+        #cv2.imshow('mask_yellow', mask_yellow)
+        #cv2.imshow('mask_red', mask_red)
+        #cv2.imshow('mask_green', mask_green)
         #height, width, channels = frame.shape
 
         ## Выводим размеры
