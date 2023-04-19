@@ -38,6 +38,7 @@ for file_name in os.listdir(folder_path):
     file_path = os.path.join(folder_path, file_name)
     if os.path.isfile(file_path):
         sign=cv2.imread(file_path, cv2.IMREAD_UNCHANGED)
+        #sign = cv2.GaussianBlur(sign, (3,3), 0)
         mask = sign[:, :, 3]
         kp, des = orb.detectAndCompute(sign, mask)
         sign_red.append((file_name.replace(".png", ""),kp,des))
@@ -48,6 +49,7 @@ for file_name in os.listdir(folder_path):
     file_path = os.path.join(folder_path, file_name)
     if os.path.isfile(file_path):
         sign=cv2.imread(file_path, cv2.IMREAD_UNCHANGED)
+        #sign = cv2.GaussianBlur(sign, (3,3), 0)
         mask = sign[:, :, 3]
         kp, des = orb.detectAndCompute(sign, mask)
         sign_blue.append((file_name.replace(".png", ""),kp,des))
@@ -185,12 +187,11 @@ while True:
 
             for object_name, match in matches.items():
                 good_matches = []
-                print(f"SSSSSSSSSSSSSS")
                 for m in match:
-                    print(f"For {object_name} === {m.distance}")
+                    
                     if m.distance < 58:
                         good_matches.append(m)
-                if len(good_matches) > 10 and (best_match is None or len(good_matches) > len(best_match)):
+                if len(good_matches) > 5 and (best_match is None or len(good_matches) > len(best_match)):
                     best_match = good_matches
                     best_match_object = object_name
                     distCoef = m.distance

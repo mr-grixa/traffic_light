@@ -24,7 +24,7 @@
   <ItemGroup>
     <Compile Include="traffic_light.py" />
     <Compile Include="класс1.py" />
-    <Compile Include="модуль1.py" />
+    <Compile Include="класс2.py" />
   </ItemGroup>
   <ItemGroup>
     <Interpreter Include="env\">
