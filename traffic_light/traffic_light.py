@@ -55,6 +55,18 @@ for file_name in os.listdir(folder_path):
         sign_blue.append((file_name.replace(".png", ""),kp,des))
         print(file_name)
 
+folder_path = dir_path+'/signs/yellow'
+sign_yellow = []
+for file_name in os.listdir(folder_path):
+    file_path = os.path.join(folder_path, file_name)
+    if os.path.isfile(file_path):
+        sign=cv2.imread(file_path, cv2.IMREAD_UNCHANGED)
+        #sign = cv2.GaussianBlur(sign, (3,3), 0)
+        mask = sign[:, :, 3]
+        kp, des = orb.detectAndCompute(sign, mask)
+        sign_yellow.append((file_name.replace(".png", ""),kp,des))
+        print(file_name)
+
 
 
 rectMax=200
@@ -97,8 +109,9 @@ while True:
 
         rectangles = find_convex_contours(mask_red, rectMin,rectMax)
         for x1, y1, x2, y2 in rectangles:
+            #Выделяем область интереса
             roi = frame[y1:y2, x1:x2]
-
+            #Сопоставляем объект с шаблонами
             kp, des = orb.detectAndCompute(roi, None)
             matches = {}
             if des is not None and kp is not NULL:
@@ -111,16 +124,18 @@ while True:
             best_match_object = None
             for object_name, match in matches.items():
                 good_matches = []
-                for m in match:
-                    #print(f"Для обьекта {object_name} совпадение равняется {m.distance}")
+                for m in match:                   
                     if m.distance < 58:
                         good_matches.append(m)
                 if len(good_matches) > 10 and (best_match is None or len(good_matches) > len(best_match)):
                     best_match = good_matches
                     best_match_object = object_name
                     distCoef = m.distance
-
+            #Если объект найден рисуем подпись 
+            if best_match_object is not None:
+                cv2.putText(frame,best_match_object,(x1, y2),cv2.FONT_HERSHEY_SIMPLEX,1,(0, 255, 0),2,cv2.LINE_AA,bottomLeftOrigin=False)
             roi = cv2.drawKeypoints(roi, kp, None)
+            #Переносим изменения на основное изображение 
             frame[y1:y2, x1:x2] =roi
 
             roiGray=mask_red[y1:y2, x1:x2]
@@ -134,10 +149,10 @@ while True:
                     fill_ratio = white_pixels / circle_area
                     if fill_ratio >0.5:
                         cv2.circle(roi, (int(x), int(y)), int(r), (0, 255, 0), 2)
-            cv2.rectangle(frame, (x1, y1), (x2,y2), (0, 0, 255), 1)
+            cv2.rectangle(frame, (x1, y1), (x2,y2), (0, 0, 255), 2)
             
             if best_match_object is not None:
-                cv2.putText(frame,best_match_object,(x1, y2),cv2.FONT_HERSHEY_SIMPLEX,1,(0, 0, 0),2,cv2.LINE_AA,bottomLeftOrigin=False)
+                cv2.putText(frame,best_match_object,(x1, y2),cv2.FONT_HERSHEY_SIMPLEX,1,(0, 255, 0),2,cv2.LINE_AA,bottomLeftOrigin=False)
         
                 
         rectangles = find_convex_contours(mask_green, rectMin,rectMax)
@@ -153,10 +168,36 @@ while True:
                     fill_ratio = white_pixels / circle_area
                     if fill_ratio >0.5:
                         cv2.circle(roi, (int(x), int(y)), int(r), (0, 255, 0), 2)    
-            cv2.rectangle(frame, (x1, y1), (x2,y2), (0, 255, 0), 1)
+            cv2.rectangle(frame, (x1, y1), (x2,y2), (0, 255, 0), 2)
 
         rectangles = find_convex_contours(mask_yellow, rectMin,rectMax)
         for x1, y1, x2, y2 in rectangles:
+            
+            roi = frame[y1:y2, x1:x2]
+            kp, des = orb.detectAndCompute(roi, None)
+            matches = {}
+            if des is not None and kp is not NULL:
+                for file_name,kpY,desY in sign_yellow:
+                    bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+                    matches[file_name] = bf.match(desY, des)
+            # Находим наиболее подходящий объект на изображении
+            best_match = None
+            distCoef = 100
+            best_match_object = None
+            for object_name, match in matches.items():
+                good_matches = []
+                for m in match:
+                    print(f"{object_name}+++ {m.distance}")
+                    if m.distance < 58:
+                        good_matches.append(m)
+                if len(good_matches) > 10 and (best_match is None or len(good_matches) > len(best_match)):
+                    best_match = good_matches
+                    best_match_object = object_name
+                    distCoef = m.distance
+
+            #roi = cv2.drawKeypoints(roi, kp, None)
+            #frame[y1:y2, x1:x2] =roi
+
             roiGray=mask_yellow[y1:y2, x1:x2]
             circles = cv2.HoughCircles(roiGray, cv2.HOUGH_GRADIENT, 1, 10, param1=80, param2=80, minRadius=5, maxRadius=100)
             if circles is not None:
@@ -168,8 +209,10 @@ while True:
                     fill_ratio = white_pixels / circle_area
                     if fill_ratio >0.5:
                         cv2.circle(roi, (int(x), int(y)), int(r), (0, 255, 255), 2)
-            cv2.rectangle(frame, (x1, y1), (x2,y2), (0, 255, 255), 1)
-            
+            cv2.rectangle(frame, (x1, y1), (x2,y2), (0, 255, 255), 2)
+            if best_match_object is not None:
+                cv2.putText(frame,best_match_object,(x1, y2),cv2.FONT_HERSHEY_SIMPLEX,1,(0, 255, 0),2,cv2.LINE_AA,bottomLeftOrigin=False)
+        
 
         rectangles = find_convex_contours(mask_blue, rectMin,rectMax)
         for x1, y1, x2, y2 in rectangles:
@@ -198,9 +241,9 @@ while True:
 
             roi = cv2.drawKeypoints(roi, kp, None)
             frame[y1:y2, x1:x2] =roi
-            cv2.rectangle(frame, (x1, y1), (x2,y2), (255, 0, 0), 1)
+            cv2.rectangle(frame, (x1, y1), (x2,y2), (255, 0, 0), 2)
             if best_match_object is not None:
-                cv2.putText(frame,best_match_object,(x1, y2),cv2.FONT_HERSHEY_SIMPLEX,1,(0, 0, 0),2,cv2.LINE_AA,bottomLeftOrigin=False)
+                cv2.putText(frame,best_match_object,(x1, y2),cv2.FONT_HERSHEY_SIMPLEX,1,(0, 255, 0),2,cv2.LINE_AA,bottomLeftOrigin=False)
               
 
 
